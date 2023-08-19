@@ -16,6 +16,7 @@
 #include <LibWeb/Painting/PaintableBox.h>
 #include <LibWeb/Painting/StackingContext.h>
 #include <LibWeb/Platform/FontPlugin.h>
+#include <LibGfx/TextDirection.h>
 
 namespace Web::Painting {
 
@@ -606,19 +607,31 @@ static void paint_text_fragment(PaintContext& context, Layout::TextNode const& t
 
         auto text = text_node.text_for_rendering();
 
-        DevicePixelPoint baseline_start { fragment_absolute_device_rect.x(), fragment_absolute_device_rect.y() + context.rounded_device_pixels(fragment.baseline()) };
-        Utf8View view { text.substring_view(fragment.start(), fragment.length()) };
+        auto view = text.substring_view(fragment.start(), fragment.length());
+        auto view_direction = Gfx::get_text_direction(view);
 
         auto& scaled_font = fragment.layout_node().scaled_font(context);
 
-        painter.draw_text_run(baseline_start.to_type<int>(), view, scaled_font, text_node.computed_values().color());
+        painter.draw_text(fragment_absolute_device_rect.to_type<int>(),
+            view,
+            scaled_font,
+            view_direction == Gfx::TextDirection::LTR ? Gfx::TextAlignment::CenterLeft : Gfx::TextAlignment::CenterRight,
+            text_node.computed_values().color(),
+            Gfx::TextElision::None,
+            Gfx::TextWrapping::Wrap);
 
         auto selection_rect = context.enclosing_device_rect(fragment.selection_rect(text_node.font())).to_type<int>();
         if (!selection_rect.is_empty()) {
             painter.fill_rect(selection_rect, context.palette().selection());
             Gfx::PainterStateSaver saver(painter);
             painter.add_clip_rect(selection_rect);
-            painter.draw_text_run(baseline_start.to_type<int>(), view, scaled_font, context.palette().selection_text());
+            painter.draw_text(fragment_absolute_device_rect.to_type<int>(),
+                view,
+                scaled_font,
+                view_direction == Gfx::TextDirection::LTR ? Gfx::TextAlignment::CenterLeft : Gfx::TextAlignment::CenterRight,
+                context.palette().selection_text(),
+                Gfx::TextElision::None,
+                Gfx::TextWrapping::Wrap);
         }
 
         paint_text_decoration(context, painter, text_node, fragment);
